@@ -1,54 +1,86 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
 import { appWindow } from "@tauri-apps/api/window";
-import "./App.css";
+import { emit, listen } from "@tauri-apps/api/event";
+import { Sun, Moon } from "lucide-react";
+import classes from "./App.module.css";
+
+import {
+  AppShell,
+  ActionIcon,
+  CloseButton,
+  NativeSelect,
+  Switch,
+  Button,
+  useMantineColorScheme,
+  useMantineTheme,
+} from "@mantine/core";
 await appWindow.setAlwaysOnTop(true);
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [timerText, setTimerText] = useState("00:00");
+  const [shouldTimerReset, setShouldTimerReset] = useState(false);
+  const { colorScheme, setColorScheme, clearColorScheme, toggleColorScheme } =
+    useMantineColorScheme({ keepTransitions: true });
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  useEffect(() => {
+    invoke("get_is_dark_mode").then((isDarkMode) => {
+      setColorScheme(isDarkMode ? "dark" : "light");
+    });
+    console.log("out of useEffect, colorScheme", colorScheme);
 
+    let unlistenSetTimer: any;
+    let unlistenShouldTimerReset: any;
+    async function f() {
+      unlistenSetTimer = await listen("set-timer", (event) => {
+        setTimerText(event.payload as string);
+      });
+      unlistenShouldTimerReset = await listen("should-timer-reset", (event) => {
+        setShouldTimerReset(event.payload as boolean);
+        setTimerText("00:00");
+      });
+    }
+    f();
+
+    return () => {
+      if (unlistenSetTimer) {
+        unlistenSetTimer();
+      }
+      if (unlistenShouldTimerReset) {
+        unlistenShouldTimerReset();
+      }
+    };
+  }, []);
+
+  const sunIcon = <Sun size={17} />;
+  const moonIcon = <Moon size={17} />;
   return (
-    <div className="container">
-      <h1>Welcome to Tauri!</h1>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-
-      <p>{greetMsg}</p>
-    </div>
+    <AppShell header={{ height: 60 }}>
+      <AppShell.Header>
+        <div className={classes.header} data-tauri-drag-region>
+          <Switch
+            size="md"
+            checked={colorScheme !== "dark"}
+            color={useMantineTheme().colors.yellow[4]}
+            onLabel={sunIcon}
+            offLabel={moonIcon}
+            onChange={() => {
+              toggleColorScheme();
+              invoke("set_is_dark_mode", {
+                isDarkMode: colorScheme !== "dark",
+              });
+            }}
+          />
+          <CloseButton />
+        </div>
+      </AppShell.Header>
+      <AppShell.Main>
+        <div className="container">
+          <p>{timerText}</p>
+        </div>
+      </AppShell.Main>
+    </AppShell>
   );
 }
 
