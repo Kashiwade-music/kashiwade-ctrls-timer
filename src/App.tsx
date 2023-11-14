@@ -1,7 +1,9 @@
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
+import { appWindow } from "@tauri-apps/api/window";
 import "./App.css";
+await appWindow.setAlwaysOnTop(true);
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
